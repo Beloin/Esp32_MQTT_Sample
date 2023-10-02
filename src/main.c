@@ -37,6 +37,10 @@
 #define WIFI_FAIL_BIT BIT1
 #define ESP_MAXIMUM_RETRY 5
 
+#define PASSWORD
+#define SSID 
+
+
 static const char *TAG = "MQTT_TEST";
 static EventGroupHandle_t s_wifi_event_group;
 
@@ -65,7 +69,7 @@ void app_main()
 
     // TODO: Configure Broker -> https://mosquitto.org/
     esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = "192.168.0.82",
+        .broker.address.uri = "mqtt://192.168.0.82",
         .broker.address.port = 1883,
     };
 
@@ -81,11 +85,22 @@ void app_main()
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
     configure_wifi();
 
-    // esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-    // esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-    // esp_mqtt_client_start(client);
+    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
 
-    // esp_netif_init();
+    if (client == NULL)
+    {
+        ESP_LOGE(TAG, "Could not connect to MQTT.");
+        return;
+    }
+
+    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    esp_mqtt_client_start(client);
+    
+    ESP_LOGI(TAG, "Client subscribed to topic\n");
+    esp_mqtt_client_subscribe(client, "testtopic/hai", 1);
+    ESP_LOGI(TAG, "Waiting 5 Seconds to publish to the same topic...\n");
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    esp_mqtt_client_publish(client, "testtopic/hai", "test", 0, 1, 0);
 }
 
 void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -110,6 +125,7 @@ void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event
         break;
     case MQTT_EVENT_DATA:
         ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+        ESP_LOGI(TAG, "%s", event->data);
         break;
     case MQTT_EVENT_ERROR:
         ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
@@ -119,9 +135,6 @@ void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event
         break;
     }
 }
-
-#define PASSWORD "1280B34A"
-#define SSID "CLARO_2G80B34A"
 
 static void configure_wifi()
 {
