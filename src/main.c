@@ -8,6 +8,8 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 
+#include "esp_timer.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -37,9 +39,8 @@
 #define WIFI_FAIL_BIT BIT1
 #define ESP_MAXIMUM_RETRY 5
 
-#define PASSWORD
-#define SSID 
-
+#define PASSWORD "1280B34A"
+#define SSID "CLARO_2G80B34A"
 
 static const char *TAG = "MQTT_TEST";
 static EventGroupHandle_t s_wifi_event_group;
@@ -51,6 +52,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 static void configure_wifi();
 
+int64_t start_us = 0, end_us = 0;
 void app_main()
 {
     printf("Hello WiFi...!\n");
@@ -95,12 +97,18 @@ void app_main()
 
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
-    
+
     ESP_LOGI(TAG, "Client subscribed to topic\n");
-    esp_mqtt_client_subscribe(client, "testtopic/hai", 1);
-    ESP_LOGI(TAG, "Waiting 5 Seconds to publish to the same topic...\n");
+    esp_mqtt_client_subscribe(client, "new_topic/1", 1);
+    // ESP_LOGI(TAG, "Waiting 5 Seconds to publish to the same topic...\n");
+    // vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+    start_us = esp_timer_get_time();
+    esp_mqtt_client_publish(client, "new_topic/1", "test", 0, 0, 0);
+
     vTaskDelay(5000 / portTICK_PERIOD_MS);
-    esp_mqtt_client_publish(client, "testtopic/hai", "test", 0, 1, 0);
+    ESP_LOGI(TAG, "End_us: %lld -> Start_Us: %lld", end_us, start_us);
+    ESP_LOGI(TAG, "With QoS 0: %lld", ((int64_t)(end_us - start_us)));
 }
 
 void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -124,6 +132,7 @@ void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event
         ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
         break;
     case MQTT_EVENT_DATA:
+        end_us = esp_timer_get_time();
         ESP_LOGI(TAG, "MQTT_EVENT_DATA");
         ESP_LOGI(TAG, "%s", event->data);
         break;

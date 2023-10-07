@@ -119,3 +119,5 @@ size_info.txt
 .clangd
 
 sdkconfig.esp32doit-devkit-v1
+
+sdkconfig
