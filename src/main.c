@@ -39,8 +39,8 @@
 #define WIFI_FAIL_BIT BIT1
 #define ESP_MAXIMUM_RETRY 5
 
-#define PASSWORD "1280B34A"
-#define SSID "CLARO_2G80B34A"
+#define SSID "<wifi_ssid>"
+#define PASSWORD "<wifi_pass"
 
 static const char *TAG = "MQTT_TEST";
 static EventGroupHandle_t s_wifi_event_group;
@@ -52,15 +52,19 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 static void configure_wifi();
 
+const static char *mqtt_ssl = R"EOF(-----BEGIN CERTIFICATE-----
+<CERT PEM>
+-----END CERTIFICATE-----
+)EOF";
+
 int64_t start_us = 0, end_us = 0;
 void app_main()
 {
-    printf("Hello WiFi...!\n");
     ESP_LOGI(TAG, "[APP] Startup..");
     ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
     ESP_LOGI(TAG, "[APP] IDF version: %s", esp_get_idf_version());
 
-    // TODO: Configure software Log level
+    // Configure software Log level
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("mqtt_client", ESP_LOG_VERBOSE);
     esp_log_level_set("mqtt_example", ESP_LOG_VERBOSE);
@@ -69,13 +73,17 @@ void app_main()
     esp_log_level_set("transport", ESP_LOG_VERBOSE);
     esp_log_level_set("outbox", ESP_LOG_VERBOSE);
 
-    // TODO: Configure Broker -> https://mosquitto.org/
+    // Configure Broker. Can use https://mosquitto.org/
     esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = "mqtt://192.168.0.82",
-        .broker.address.port = 1883,
-    };
+        .broker.address.uri = "mqtts://<mqtt_api>",
+        .broker.address.port = 8883,
+        .credentials.username = "<username>",
+        .credentials.authentication.password = "<password>",
+        .broker.verification.certificate = (const char *)mqtt_ssl,
+        // .broker.verification.skip_cert_common_name_check = true
+        .session.last_will.qos = 1};
 
-    // TODO: Configure WiFi
+    // Configure WiFi
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
@@ -83,12 +91,10 @@ void app_main()
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
     configure_wifi();
 
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-
     if (client == NULL)
     {
         ESP_LOGE(TAG, "Could not connect to MQTT.");
@@ -100,8 +106,7 @@ void app_main()
 
     ESP_LOGI(TAG, "Client subscribed to topic\n");
     esp_mqtt_client_subscribe(client, "new_topic/1", 1);
-    // ESP_LOGI(TAG, "Waiting 5 Seconds to publish to the same topic...\n");
-    // vTaskDelay(5000 / portTICK_PERIOD_MS);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     start_us = esp_timer_get_time();
     esp_mqtt_client_publish(client, "new_topic/1", "test", 0, 0, 0);
